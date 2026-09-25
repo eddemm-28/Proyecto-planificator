@@ -127,10 +127,10 @@ Las cuatro cifras coinciden exactamente con la comprobación y con la
 resolución a mano de la Parte 1. Diagramas generados por el simulador (el
 verde representa tiempo de CPU, la barra gris tiempo de espera):
 
-![Diagrama de Gantt FIFO](test/taller_fifo.png)
-![Diagrama de Gantt SJF](test/taller_sjf.png)
-![Diagrama de Gantt RR](test/taller_rr.png)
-![Diagrama de Gantt SRT](test/taller_srt.png)
+![Diagrama de Gantt FIFO](images/taller_fifo.png)
+![Diagrama de Gantt SJF](images/taller_sjf.png)
+![Diagrama de Gantt RR](images/taller_rr.png)
+![Diagrama de Gantt SRT](images/taller_srt.png)
 
 ### Qué línea de código distingue a cada algoritmo
 
@@ -176,6 +176,53 @@ no terminó. Lo que varía es **el orden con que entran a la cola**
   la ráfaga más larga, termina siendo interrumpido en cuanto llega P2 —
   algo que en SJF no pasa porque SJF no revisa llegadas a mitad de turno.
 
-Sin este bloque de expropiación, SRT se comporta exactamente como RR
-(ambos reencolan sin terminar de "respetar" la ráfaga más corta), que es
-justo la señal que menciona el README para saber si falta implementar algo.
+## Punto 5 — Caso propio de tres colas
+
+Archivo de configuración (`test/caso_propio.txt`):
+
+```
+define queues 3
+define scheduling 1 rr
+define scheduling 2 sjf
+define scheduling 3 fifo
+define quantum 1 2
+define quantum 2 2
+define quantum 3 2
+process A1 0 5 1
+process A2 3 4 1
+process B1 0 3 2
+process B2 1 2 2
+process C1 0 2 3
+process C2 4 3 3
+start
+```
+
+![Diagrama caso propio](images/caso_propio.png)
+
+Espera promedio obtenida: **8.333**. Secuencia de ejecución:
+
+A1(2) B2(2) C1(2) A1(2) B1(2) C2(2) A2(2) B1(1) C2(1) A1(1) A2(2)
+
+
+### Por qué el resultado difiere de planificar todo en una sola cola
+
+Aquí conviene aclarar un matiz: "colas de prioridad" en este simulador no
+es prioridad preventiva clásica, donde la cola 1 acapara la CPU mientras
+tenga algo listo. El simulador recorre las colas de forma **circular**,
+dándole un turno a cada una por rotación — se ve en la secuencia de
+ejecución, donde nunca hay dos turnos seguidos de la misma cola, aunque la
+cola 1 tenga más trabajo pendiente que las demás.
+
+- **Cada cola aplica su propio algoritmo solo entre sus propios procesos.**
+  Dentro de la cola 2, SJF ordena a B1 y B2 por ráfaga entre ellos, pero eso
+  no afecta el orden de la cola 1 ni el de la 3, que son independientes.
+- **El reparto entre colas es por turnos, no por urgencia.** Aunque la cola
+  1 tenga dos procesos pesados (A1 con ráfaga 5, A2 con ráfaga 4) y la cola
+  3 solo procesos cortos, cada una recibe exactamente un turno de 2
+  unidades por vuelta — ninguna "adelanta" a la otra por tener más carga.
+- **Consecuencia medible:** B2 (ráfaga 2, en una cola con poca competencia)
+  termina rápido, en t=4, mientras que A1 y A2, aunque están en la cola de
+  mayor prioridad nominal, tardan más en total (t=17 y t=19) porque tienen
+  que ceder el turno a las otras dos colas en cada vuelta — algo que no
+  pasaría si compitieran solos en una única cola RR contra procesos
+  igual de largos.
